@@ -1,0 +1,17 @@
+cffi==1.14.6
+click==8.0.1
+cryptography==35.0.0
+Deprecated==1.2.13
+Flask==2.0.2
+itsdangerous==2.0.1
+Jinja2==3.0.2
+jwcrypto==1.0
+MarkupSafe==2.0.1
+prettytable==2.2.1
+pycparser==2.20
+python-irodsclient==1.0.0
+six==1.16.0
+wcwidth==0.2.5
+Werkzeug==2.0.2
+wrapt==1.13.1
+xmlrunner==1.7.7
