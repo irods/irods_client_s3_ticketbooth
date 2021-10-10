@@ -20,8 +20,6 @@ app = Flask(__name__)
 app.config.from_object('config')
 app.config.from_envvar('IRODS_TICKET_BOOTH_CONFIGURATION_FILE', silent=True)
 
-# TODO Port this to the PRC.
-#
 # The PRC does not have GenQuery support for tickets. Defining the following class
 # enables this, but only for the columns of interest.
 #
@@ -35,6 +33,12 @@ class GenQueryTicket(Model):
     string          = Column(String,  'TICKET_STRING',    2201)
     type            = Column(String,  'TICKET_TYPE',      2202)
     collection_name = Column(String,  'TICKET_COLL_NAME', 2228)
+
+def error_bad_request(msg):
+    return (msg, 400)
+
+def error_bad_auth_header():
+    return bad_request('Invalid authorization header: missing or incorrect value.')
 
 def get_username_and_password(auth_header):
     # Remove the "Basic " prefix.
@@ -70,12 +74,13 @@ def generate_jwt(data):
 @app.route("/create")
 def create():
     if 'authorization' not in request.headers:
-        return 'Authorization header is not set.'
+        return error_bad_auth_header()
 
     username, password = get_username_and_password(request.headers.get('authorization'))
 
+    # Make sure the collection URL query argument is set.
     if 'collection' not in request.args:
-        return '"collection" argument is not set.'
+        return ('Invalid query argument: [collection] is not set', 400)
 
     # Verify that the collection exists.
     collection = Markup(request.args.get('collection', '')).unescape()
@@ -86,24 +91,19 @@ def create():
     if 'permission' in request.args:
         permission = Markup(request.args.get('permission', '')).unescape()
         if permission not in ['read', 'write']:
-            return 'Invalid ticket permission [{}]'.format(permission)
+            return ('Invalid query argument: bad ticket permission [{}]'.format(permission), 400)
 
     with iRODSSession(**make_irods_credentials_dict(username, password)) as session:
         if not session.collections.exists(collection):
-            return "Collection does not exist or user does not have permission to access the collection"
+            return ('Collection [{}] does not exist or user does not have permission to access the collection'.format(collection), 400)
 
         # Generate a ticket with the requested permissions for a collection.
         # TODO What happens if the ticket matches a preexisting token?
         ticket_handle = Ticket(session)
         ticket_handle.issue(permission, collection)
 
-        # Generate a JWT containing the ticket and the collection associated with
-        # the ticket.
-        return generate_token({'ticket': ticket_handle.ticket, 'collection': collection})
-
-@app.route("/resolve/<token>")
-def resolve(token):
-    app.logger.info('token = [%s]', token)
+        # Generate the JWT.
+        return generate_jwt({'ticket': ticket_handle.ticket, 'collection': collection})
 
 # This API needs more investigation. Until we know the use-cases around it, it
 # will remain commented out.
@@ -121,7 +121,7 @@ def resolve(token):
 @app.route("/list")
 def list():
     if 'authorization' not in request.headers:
-        return 'Authorization header is not set'
+        return error_bad_auth_header()
 
     username, password = get_username_and_password(request.headers.get('authorization'))
     matches = []
@@ -142,7 +142,7 @@ def revoke(token):
     app.logger.info('token = [%s]', token)
 
     if 'authorization' not in request.headers:
-        return 'Authorization header is not set'
+        return error_bad_auth_header()
 
     username, password = get_username_and_password(request.headers.get('authorization'))
 
