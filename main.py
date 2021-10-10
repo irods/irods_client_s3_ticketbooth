@@ -1,6 +1,5 @@
 # TODO
 # - Add error handling
-# - Externalize configuration
 # - Add support for SSL
 
 from flask import Flask, request, jsonify
@@ -18,8 +17,8 @@ import base64
 import json
 
 app = Flask(__name__)
-
-IRODS_TICKET_BOOTH_SHARED_SECRET = 'THIS IS A SHARED SECRET!'
+app.config.from_object('config')
+app.config.from_envvar('IRODS_TICKET_BOOTH_CONFIGURATION_FILE', silent=True)
 
 # TODO Port this to the PRC.
 #
@@ -49,18 +48,17 @@ def get_username_and_password(auth_header):
 
 def make_irods_credentials_dict(username, password):
     return {
-        'host': 'localhost',
-        'port': 1247,
+        'host': app.config['IRODS_HOST'],
+        'port': app.config['IRODS_PORT'],
         'user': username,
         'password': password,
-        'zone': 'tempZone'
+        'zone': app.config['IRODS_ZONE'],
     }
 
-def generate_token(data):
-    #key = jwk.JWK(generate='oct', size=256)
-    key = jwk.JWK.from_password(IRODS_TICKET_BOOTH_SHARED_SECRET)
+def generate_jwt(data):
+    key = jwk.JWK.from_password(app.config['IRODS_TICKET_BOOTH_SHARED_SECRET'])
 
-    token = jwt.JWT(header={'alg': 'HS256'}, claims=data)
+    token = jwt.JWT(header={'alg': app.config['IRODS_TICKET_BOOTH_JWT_HASHING_ALGORITHM']}, claims=data)
     token.make_signed_token(key)
     return token.serialize()
 
@@ -107,12 +105,18 @@ def create():
 def resolve(token):
     app.logger.info('token = [%s]', token)
 
-    # Extract the payload from the JWT and return it.
-    key = jwk.JWK.from_password(IRODS_TICKET_BOOTH_SHARED_SECRET)
-    payload = jwt.JWT(key=key, jwt=token)
-    app.logger.info('JWT claims = [%s]', payload.claims)
-
-    return payload.claims
+# This API needs more investigation. Until we know the use-cases around it, it
+# will remain commented out.
+#@app.route("/resolve/<token>")
+#def resolve(token):
+#    app.logger.info('token = [%s]', token)
+#
+#    # Extract the payload from the JWT and return it.
+#    key = jwk.JWK.from_password(app.config['IRODS_TICKET_BOOTH_SHARED_SECRET'])
+#    payload = jwt.JWT(key=key, jwt=token)
+#    app.logger.info('JWT claims = [%s]', payload.claims)
+#
+#    return payload.claims
 
 @app.route("/list")
 def list():
@@ -143,7 +147,7 @@ def revoke(token):
     username, password = get_username_and_password(request.headers.get('authorization'))
 
     # Extract the ticket from the JWT.
-    key = jwk.JWK.from_password(IRODS_TICKET_BOOTH_SHARED_SECRET)
+    key = jwk.JWK.from_password(app.config['IRODS_TICKET_BOOTH_SHARED_SECRET'])
     payload = jwt.JWT(key=key, jwt=token)
     ticket = json.loads(payload.claims)['ticket']
 
