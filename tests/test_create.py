@@ -1,16 +1,16 @@
 import pytest
 
-@pytest.mark.parametrize(('expected_permission'), (
+@pytest.mark.parametrize(('perm'), (
     ('read'),
     ('write')
 ))
 
-def test_create(client, expected_permission):
+def test_create(client, perm):
     data = {
         'username': 'kory',
         'password': 'rods',
         'collection': '/tempZone/home/kory',
-        'permission': expected_permission
+        'permission': perm
     }
 
     response = client.post('/create', data=data)
@@ -21,7 +21,7 @@ def test_create(client, expected_permission):
 
     response = client.post('/list', data=data)
     assert response.status_code == 200
-    assert '"permission":"{}"'.format(expected_permission) in response.get_data(as_text=True)
+    assert '"permission":"{}"'.format(perm) in response.get_data(as_text=True)
 
     response = client.post('/revoke/' + token, data=data)
     assert response.status_code == 200
@@ -30,7 +30,7 @@ def test_create(client, expected_permission):
     assert response.status_code == 200
     assert '[]' == response.get_data(as_text=True).strip()
 
-def test_invalid_argument(client):
+def test_invalid_permission_value(client):
     data = {
         'username': 'kory',
         'password': 'rods',
@@ -44,4 +44,12 @@ def test_invalid_argument(client):
     response = client.post('/list', data=data)
     assert response.status_code == 200
     assert '[]' == response.get_data(as_text=True).strip()
+
+#@pytest.mark.parametrize(('username', 'password'), (
+#    ('rods', 'rods'),
+#    ('write')
+#))
+
+def test_invalid_irods_credentials(client): #, username, password):
+    pass
 

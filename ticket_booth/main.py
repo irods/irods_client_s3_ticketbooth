@@ -72,33 +72,19 @@ def create_app(config=None):
         password = Markup(request.form['password']).unescape()
         collection = Markup(request.form['collection']).unescape()
 
-        if 'permission' in request.form and request.form['permission']:
+        if 'permission' in request.form:
             permission = Markup(request.form['permission']).unescape()
             if permission not in ['read', 'write']:
                 return error_bad_request('Invalid query argument: bad ticket permission [{}]'.format(permission))
         else:
-            permission = 'read'
+            permission = 'read' # Permissions default to 'read'.
 
         app.logger.info('username=[%s], password=[%s], collection=[%s], permission=[%s]',
             username, password, collection, permission)
 
-        # Make sure the collection URL query argument is set.
-        #if 'collection' not in request.args:
-        #    return ('Invalid query argument: [collection] is not set', 400)
-
-        # Verify that the collection exists.
-        #collection = Markup(request.args.get('collection', '')).unescape()
-
-        # Permissions default to 'read'.
-        #permission = 'read'
-        #if 'permission' in request.args:
-        #    permission = Markup(request.args.get('permission', '')).unescape()
-        #    if permission not in ['read', 'write']:
-        #        return ('Invalid query argument: bad ticket permission [{}]'.format(permission), 400)
-
         with iRODSSession(**make_irods_credentials_dict(username, password)) as session:
             if not session.collections.exists(collection):
-                return ('Collection [{}] does not exist or user does not have permission to access the collection'.format(collection), 400)
+                return error_bad_request('Insufficient permissions: access not allowed to [{}]'.format(collection))
 
             # Allow up to three attempts for ticket / JWT creation.
             # This improves durability in the face of duplicate ticket strings.
