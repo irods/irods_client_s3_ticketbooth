@@ -1,0 +1,5 @@
+*.un
+*.swp
+venv/
+*.pyc
+__pycache__/
